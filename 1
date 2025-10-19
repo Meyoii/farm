@@ -1,0 +1,233 @@
+local VirtualUser = game:GetService("VirtualUser")
+game:GetService("Players").LocalPlayer.Idled:connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+
+spawn(function()
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
+
+    local function monitorCharacter(char)
+        if not char then return end
+        local humanoid = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
+        if not humanoid then return end
+
+        humanoid.HealthChanged:Connect(function(health)
+            if health and health <= 1 then
+                wait(0.2) 
+                local ok, err = pcall(function()
+                    player:Kick("เลือดเหลือ 1 หรือน้อยกว่า ถูกเตะออกจากเกม")
+                end)
+                if not ok then
+                    warn("Kick failed:", err)
+                end
+            end
+        end)
+    end
+
+    if player.Character then
+        monitorCharacter(player.Character)
+    end
+    player.CharacterAdded:Connect(monitorCharacter)
+end)
+
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local status = player:WaitForChild("Status")
+local NetworkEvent = ReplicatedStorage.Modules.NetworkFramework.NetworkEvent
+
+
+local RemoteArgsWater = {"fire", [3] = "Use Item", [4] = "Water"}
+local RemoteArgsFood  = {"fire", [3] = "Use Item", [4] = "Bread"}
+
+
+local hasUsedWater = false
+local hasUsedFood  = false
+
+
+local args = {
+    "fire",
+    nil,
+    "Use Tool",
+    "Pickaxe"
+}
+NetworkEvent:FireServer(unpack(args))
+
+
+local function teleportUndergroundThenPop(hrp, targetCFrame, maxStep, stepDelay)
+    maxStep = maxStep or 300
+    stepDelay = stepDelay or 1
+
+    hrp.Anchored = true
+    local undergroundOffset = 1
+    local startPos = hrp.Position - Vector3.new(0, undergroundOffset, 0)
+    local targetPosUnderground = targetCFrame.Position - Vector3.new(0, undergroundOffset, 0)
+    hrp.CFrame = CFrame.new(startPos, targetPosUnderground)
+
+    local dist = (targetPosUnderground - startPos).Magnitude
+    local steps = math.max(1, math.ceil(dist / maxStep))
+
+    for i = 1, steps do
+        local alpha = i / steps
+        local newPos = startPos:Lerp(targetPosUnderground, alpha)
+        hrp.CFrame = CFrame.new(newPos, targetCFrame.Position)
+        task.wait(stepDelay)
+    end
+
+    hrp.CFrame = targetCFrame
+    hrp.Anchored = false
+end
+
+
+local function AutoFarmLoop()
+    while true do
+        local char = player.Character or player.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+
+        local targetCFrame1 = CFrame.new(
+          -240.629974, 14.6281853, -2458.94849, -0.941889822, 1.50447566e-08, 0.335921943, 2.6380663e-08, 1, 2.91821411e-08, -0.335921943, 3.63482044e-08, -0.941889822
+        )
+
+        teleportUndergroundThenPop(hrp, targetCFrame1, 300, 1)
+        task.wait(2)
+
+        local humanoid = char:WaitForChild("Humanoid")
+        local target = CFrame.new(-242.078705, 12.5401459, -2452.75781, -0.998613715, -0.0526360348, 0.000540687935, -0.0526388064, 0.998556376, -0.0106932474, 2.29428115e-05, -0.0107068839, -0.99994278
+        )
+        humanoid:MoveTo(target.Position)
+
+     
+        local inventory = player:WaitForChild("Inventory")
+        local lastValue = nil
+        local sameCount = 0
+
+        while task.wait(0.5) do
+            local RockValue = inventory:GetAttribute("Rock")
+            if RockValue then
+                print("Rock =", RockValue)
+
+                if RockValue == lastValue then
+                    sameCount = sameCount + 1
+                else
+                    sameCount = 0
+                    lastValue = RockValue
+                end
+
+                if sameCount >= 50 then
+                    warn("Rock ไม่เปลี่ยน 30 รอบ ติดต่อกัน — วาปทำงานใหม่")
+                    break
+                end
+
+                if RockValue >= 100 then
+                    break
+                end
+            else
+                warn("ไม่พบ Attribute 'Rock'")
+                break
+            end
+        end
+
+       
+        local RemoteArgs = {"fire", [3] = "BrakAutoFarm"}
+        NetworkEvent:FireServer(unpack(RemoteArgs, 1, table.maxn(RemoteArgs)))
+        task.wait(2)
+
+       
+        local targetCFrame = CFrame.new(
+            1932.3092, 14.4683819, 2293.3103,
+            -0.184279501, 3.30193686e-08, 0.982873857,
+            -3.51323837e-09, 1, -3.42534143e-08,
+            -0.982873857, -9.76527215e-09, -0.184279501
+        )
+        teleportUndergroundThenPop(hrp, targetCFrame, 300, 1)
+        task.wait(2)
+
+        local networkEvent = ReplicatedStorage.Modules.NetworkFramework.NetworkEvent
+        networkEvent:FireServer(
+            "fire",
+            nil,
+            "Move Item",
+            Players.LocalPlayer.Inventory,
+            Players.LocalPlayer.Safe,
+            "Rock",
+            100
+        )
+
+        task.wait(2)
+
+        
+        local targetCFrame2 = CFrame.new(
+            3001.08984, 14.5380421, 2279.85352,
+            -0.68775034, 3.05635489e-10, 0.72594732,
+            1.54405133e-09, 1, 1.04179232e-09,
+            -0.72594732, 1.8373929e-09, -0.68775034
+        )
+        teleportUndergroundThenPop(hrp, targetCFrame2, 300, 1)
+        task.wait(2)
+
+        
+        local RemoteArgs1 = {"fire", [3] = "Supermarket", [4] = "Water", [5] = 15}
+        local RemoteArgs2 = {"fire", [3] = "Supermarket", [4] = "Bread", [5] = 15}
+        NetworkEvent:FireServer(unpack(RemoteArgs1, 1, table.maxn(RemoteArgs1)))
+        NetworkEvent:FireServer(unpack(RemoteArgs2, 1, table.maxn(RemoteArgs2)))
+
+        print("🔁 รอบนี้เสร็จสิ้น ")
+        task.wait(2)
+    end
+end
+
+
+local function AutoEatDrinkLoop()
+    while true do
+        task.wait(1)
+        local thirsty = status:GetAttribute("Thirsty") or 0
+        local hunger  = status:GetAttribute("Hunger") or 0
+
+        if thirsty < 70 and not hasUsedWater then
+            NetworkEvent:FireServer(unpack(RemoteArgsWater, 1, table.maxn(RemoteArgsWater)))
+            hasUsedWater = true
+            print("💧 ใช้ Water เพราะ Thirsty =", thirsty)
+        end
+        if thirsty >= 70 and hasUsedWater then
+            hasUsedWater = false
+        end
+
+        if thirsty >= 70 then
+            if hunger < 70 and not hasUsedFood then
+                NetworkEvent:FireServer(unpack(RemoteArgsFood, 1, table.maxn(RemoteArgsFood)))
+                hasUsedFood = true
+                print("🍞 ใช้ Bread เพราะ Hunger =", hunger)
+            elseif hunger >= 70 and hasUsedFood then
+                hasUsedFood = false
+            end
+        end
+    end
+end
+
+
+getgenv().AutoJump = true 
+
+spawn(function()
+    while task.wait(2) do 
+        if not getgenv().AutoJump then
+            break
+        end
+
+        local player = game:GetService("Players").LocalPlayer
+        local char = player.Character or player.CharacterAdded:Wait()
+        local humanoid = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid")
+
+        if humanoid and humanoid.Health > 0 then
+            humanoid.Jump = true
+        end
+    end
+end)
+
+
+spawn(AutoFarmLoop)
+spawn(AutoEatDrinkLoop)
