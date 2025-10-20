@@ -1,14 +1,26 @@
+-- 🟢 รอให้เกมโหลดครบก่อนเริ่มทุกระบบ
+repeat task.wait() until game:IsLoaded()
+repeat task.wait() until game:GetService("Players").LocalPlayer
+repeat task.wait() until game:GetService("ReplicatedStorage"):FindFirstChild("Modules")
+repeat task.wait() until game:GetService("ReplicatedStorage").Modules:FindFirstChild("NetworkFramework")
+repeat task.wait() until game:GetService("ReplicatedStorage").Modules.NetworkFramework:FindFirstChild("NetworkEvent")
+
+task.wait(2) -- หน่วงเล็กน้อยเผื่อ asset หรือ attribute ยังโหลดไม่ครบ
+
+-- 🟢 ป้องกันหลุดเมื่อ AFK
 local VirtualUser = game:GetService("VirtualUser")
-game:GetService("Players").LocalPlayer.Idled:connect(function()
+game:GetService("Players").LocalPlayer.Idled:Connect(function()
     VirtualUser:CaptureController()
     VirtualUser:ClickButton2(Vector2.new())
 end)
 
+-- 🧠 ตัวหลัก
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
 
+-- 🟡 ป้องกันตาย (เลือด <= 1 จะเตะ)
 spawn(function()
-    local Players = game:GetService("Players")
-    local player = Players.LocalPlayer
-
     local function monitorCharacter(char)
         if not char then return end
         local humanoid = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
@@ -16,13 +28,10 @@ spawn(function()
 
         humanoid.HealthChanged:Connect(function(health)
             if health and health <= 1 then
-                wait(0.2) 
-                local ok, err = pcall(function()
+                task.wait(0.2)
+                pcall(function()
                     player:Kick("เลือดเหลือ 1 หรือน้อยกว่า ถูกเตะออกจากเกม")
                 end)
-                if not ok then
-                    warn("Kick failed:", err)
-                end
             end
         end)
     end
@@ -33,32 +42,22 @@ spawn(function()
     player.CharacterAdded:Connect(monitorCharacter)
 end)
 
-
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local player = Players.LocalPlayer
+-- ⚙️ ส่วน Network
 local status = player:WaitForChild("Status")
 local NetworkEvent = ReplicatedStorage.Modules.NetworkFramework.NetworkEvent
 
-
+-- ไอเทมที่ใช้กิน/ดื่ม
 local RemoteArgsWater = {"fire", [3] = "Use Item", [4] = "Water"}
 local RemoteArgsFood  = {"fire", [3] = "Use Item", [4] = "Bread"}
-
 
 local hasUsedWater = false
 local hasUsedFood  = false
 
-
-local args = {
-    "fire",
-    nil,
-    "Use Tool",
-    "Pickaxe"
-}
+-- เริ่มใช้เครื่องมือ Pickaxe
+local args = {"fire", nil, "Use Tool", "Pickaxe"}
 NetworkEvent:FireServer(unpack(args))
 
-
+-- 📦 ฟังก์ชันวาปแบบค่อย ๆ ไปใต้ดินก่อนโผล่
 local function teleportUndergroundThenPop(hrp, targetCFrame, maxStep, stepDelay)
     maxStep = maxStep or 300
     stepDelay = stepDelay or 1
@@ -83,28 +82,26 @@ local function teleportUndergroundThenPop(hrp, targetCFrame, maxStep, stepDelay)
     hrp.Anchored = false
 end
 
-
+-- 🔁 AutoFarm Loop หลัก
 local function AutoFarmLoop()
     while true do
         local char = player.Character or player.CharacterAdded:Wait()
         local hrp = char:WaitForChild("HumanoidRootPart")
 
+        -- จุดขุดหิน
         local targetCFrame1 = CFrame.new(
-          -240.629974, 14.6281853, -2458.94849, -0.941889822, 1.50447566e-08, 0.335921943, 2.6380663e-08, 1, 2.91821411e-08, -0.335921943, 3.63482044e-08, -0.941889822
+          -240.629974, 14.6281853, -2458.94849, -0.941889822, 1.50447566e-08, 0.335921943,
+           2.6380663e-08, 1, 2.91821411e-08, -0.335921943, 3.63482044e-08, -0.941889822
         )
-
         teleportUndergroundThenPop(hrp, targetCFrame1, 300, 1)
         task.wait(2)
 
         local humanoid = char:WaitForChild("Humanoid")
-        local target = CFrame.new(-242.078705, 12.5401459, -2452.75781, -0.998613715, -0.0526360348, 0.000540687935, -0.0526388064, 0.998556376, -0.0106932474, 2.29428115e-05, -0.0107068839, -0.99994278
-        )
-        humanoid:MoveTo(target.Position)
+        humanoid:MoveTo(Vector3.new(-242.078705, 12.5401459, -2452.75781))
 
-     
+        -- ตรวจค่า Rock
         local inventory = player:WaitForChild("Inventory")
-        local lastValue = nil
-        local sameCount = 0
+        local lastValue, sameCount = nil, 0
 
         while task.wait(0.5) do
             local RockValue = inventory:GetAttribute("Rock")
@@ -112,10 +109,9 @@ local function AutoFarmLoop()
                 print("Rock =", RockValue)
 
                 if RockValue == lastValue then
-                    sameCount = sameCount + 1
+                    sameCount += 1
                 else
-                    sameCount = 0
-                    lastValue = RockValue
+                    sameCount, lastValue = 0, RockValue
                 end
 
                 if sameCount >= 50 then
@@ -132,12 +128,11 @@ local function AutoFarmLoop()
             end
         end
 
-       
-        local RemoteArgs = {"fire", [3] = "BrakAutoFarm"}
-        NetworkEvent:FireServer(unpack(RemoteArgs, 1, table.maxn(RemoteArgs)))
+        -- หยุดฟาร์ม (ส่งรีโมท)
+        NetworkEvent:FireServer("fire", nil, "BrakAutoFarm")
         task.wait(2)
 
-       
+        -- วาปไป Safe
         local targetCFrame = CFrame.new(
             1932.3092, 14.4683819, 2293.3103,
             -0.184279501, 3.30193686e-08, 0.982873857,
@@ -147,41 +142,34 @@ local function AutoFarmLoop()
         teleportUndergroundThenPop(hrp, targetCFrame, 300, 1)
         task.wait(2)
 
-        local networkEvent = ReplicatedStorage.Modules.NetworkFramework.NetworkEvent
-        networkEvent:FireServer(
-            "fire",
-            nil,
-            "Move Item",
-            Players.LocalPlayer.Inventory,
-            Players.LocalPlayer.Safe,
-            "Rock",
-            100
+        -- ย้าย Rock ไป Safe
+        NetworkEvent:FireServer(
+            "fire", nil, "Move Item",
+            player.Inventory, player.Safe,
+            "Rock", 100
         )
-
         task.wait(2)
 
-        
+        -- วาปไป Supermarket
         local targetCFrame2 = CFrame.new(
             3001.08984, 14.5380421, 2279.85352,
             -0.68775034, 3.05635489e-10, 0.72594732,
-            1.54405133e-09, 1, 1.04179232e-09,
+             1.54405133e-09, 1, 1.04179232e-09,
             -0.72594732, 1.8373929e-09, -0.68775034
         )
         teleportUndergroundThenPop(hrp, targetCFrame2, 300, 1)
         task.wait(2)
 
-        
-        local RemoteArgs1 = {"fire", [3] = "Supermarket", [4] = "Water", [5] = 15}
-        local RemoteArgs2 = {"fire", [3] = "Supermarket", [4] = "Bread", [5] = 15}
-        NetworkEvent:FireServer(unpack(RemoteArgs1, 1, table.maxn(RemoteArgs1)))
-        NetworkEvent:FireServer(unpack(RemoteArgs2, 1, table.maxn(RemoteArgs2)))
+        -- ซื้อของกินน้ำ
+        NetworkEvent:FireServer("fire", nil, "Supermarket", "Water", 15)
+        NetworkEvent:FireServer("fire", nil, "Supermarket", "Bread", 15)
 
         print("🔁 รอบนี้เสร็จสิ้น ")
         task.wait(2)
     end
 end
 
-
+-- 🍞 ระบบกิน/ดื่มอัตโนมัติ
 local function AutoEatDrinkLoop()
     while true do
         task.wait(1)
@@ -189,17 +177,16 @@ local function AutoEatDrinkLoop()
         local hunger  = status:GetAttribute("Hunger") or 0
 
         if thirsty < 70 and not hasUsedWater then
-            NetworkEvent:FireServer(unpack(RemoteArgsWater, 1, table.maxn(RemoteArgsWater)))
+            NetworkEvent:FireServer(unpack(RemoteArgsWater))
             hasUsedWater = true
             print("💧 ใช้ Water เพราะ Thirsty =", thirsty)
-        end
-        if thirsty >= 70 and hasUsedWater then
+        elseif thirsty >= 70 and hasUsedWater then
             hasUsedWater = false
         end
 
         if thirsty >= 70 then
             if hunger < 70 and not hasUsedFood then
-                NetworkEvent:FireServer(unpack(RemoteArgsFood, 1, table.maxn(RemoteArgsFood)))
+                NetworkEvent:FireServer(unpack(RemoteArgsFood))
                 hasUsedFood = true
                 print("🍞 ใช้ Bread เพราะ Hunger =", hunger)
             elseif hunger >= 70 and hasUsedFood then
@@ -209,25 +196,19 @@ local function AutoEatDrinkLoop()
     end
 end
 
-
-getgenv().AutoJump = true 
-
+-- 🦘 Auto Jump
+getgenv().AutoJump = true
 spawn(function()
     while task.wait(2) do 
-        if not getgenv().AutoJump then
-            break
-        end
-
-        local player = game:GetService("Players").LocalPlayer
+        if not getgenv().AutoJump then break end
         local char = player.Character or player.CharacterAdded:Wait()
         local humanoid = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid")
-
         if humanoid and humanoid.Health > 0 then
             humanoid.Jump = true
         end
     end
 end)
 
-
+-- 🚀 เริ่มระบบทั้งหมด
 spawn(AutoFarmLoop)
 spawn(AutoEatDrinkLoop)
